@@ -30,7 +30,7 @@ N8N_BASE_URL=https://your-n8n-instance.com
 python3 n8n-timings.py --execution-id 946
 ```
 
-* Navigate with <kbd>A</kdb>/<kdb>D</kdb> or <kdb><-</kdb>,<kdb>-></kdb> keys
+* Navigate between plots with <kbd>A</kbd>/<kbd>D</kbd> or <kbd>←</kbd>/<kbd>→</kbd> arrow keys
 
 ## Command Line Options
 

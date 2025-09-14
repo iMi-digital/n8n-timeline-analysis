@@ -11,7 +11,6 @@ import json
 import requests
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Button
 import matplotlib.patches as patches
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
@@ -113,38 +112,14 @@ class InteractivePlotViewer:
         info_text = f"Execution {self.execution_info['execution_id']} | {self.execution_info['workflow_name']} | {self.execution_info['total_nodes']} nodes"
         ax.text(0.02, 0.98, info_text, transform=ax.transAxes, fontsize=10, 
                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-        
-        # Add navigation buttons
-        self.add_navigation_buttons()
-        
-        plt.tight_layout()
-        plt.subplots_adjust(bottom=0.15)  # Make room for buttons
-    
-    def add_navigation_buttons(self):
-        """Add navigation buttons to the plot."""
-        # Previous button
-        ax_prev = plt.axes([0.1, 0.02, 0.1, 0.04])
-        btn_prev = Button(ax_prev, '← Previous')
-        btn_prev.on_clicked(self.prev_plot)
-        
-        # Next button
-        ax_next = plt.axes([0.8, 0.02, 0.1, 0.04])
-        btn_next = Button(ax_next, 'Next →')
-        btn_next.on_clicked(self.next_plot)
-        
-        # Plot indicator
-        ax_info = plt.axes([0.25, 0.02, 0.5, 0.04])
-        ax_info.axis('off')
-        plot_names = ['Total Time', 'Avg Time', 'Count', 'Success Rate']
-        ax_info.text(0.5, 0.5, f'{plot_names[self.current_plot]} ({self.current_plot + 1}/{len(self.plots)})', 
-                    ha='center', va='center', fontsize=12, fontweight='bold',
-                    bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.7))
-        
+
         # Keyboard shortcuts info
         ax_help = plt.axes([0.02, 0.02, 0.06, 0.04])
         ax_help.axis('off')
         ax_help.text(0.5, 0.5, '← → keys', ha='center', va='center', fontsize=8, 
                     bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.7))
+                            
+        plt.tight_layout()
     
     def prev_plot(self, event):
         """Go to previous plot."""
@@ -426,7 +401,6 @@ class N8nLoopedNodeAnalyzer:
         print("\n🎯 Starting Interactive Plot Viewer...")
         print("="*60)
         print("NAVIGATION CONTROLS:")
-        print("• Click '← Previous' or 'Next →' buttons")
         print("• Use ← → arrow keys (or A/D keys)")
         print("• Press Q or Escape to close")
         print("• All plots in one window with smooth navigation")
