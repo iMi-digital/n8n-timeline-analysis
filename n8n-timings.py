@@ -12,7 +12,7 @@ import requests
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
 import argparse
 from dotenv import load_dotenv
@@ -28,24 +28,27 @@ class InteractivePlotViewer:
         self.node_summary = node_summary
         self.execution_info = execution_info
         self.current_plot = 0
-        self.plots = ['total_time', 'avg_time', 'execution_count', 'success_rate']
+        self.plots = ['total_time', 'avg_time', 'execution_count', 'success_rate', 'hierarchical_timeline']
         self.plot_titles = {
             'total_time': 'Total Execution Time by Node (Summed)',
             'avg_time': 'Average Execution Time by Node', 
             'execution_count': 'Execution Count by Node',
-            'success_rate': 'Success Rate by Node'
+            'success_rate': 'Success Rate by Node',
+            'hierarchical_timeline': 'Hierarchical Timeline View'
         }
         self.plot_colors = {
             'total_time': 'skyblue',
             'avg_time': 'lightcoral',
             'execution_count': 'lightgreen',
-            'success_rate': 'gold'
+            'success_rate': 'gold',
+            'hierarchical_timeline': 'lightsteelblue'
         }
         self.plot_units = {
             'total_time': 'seconds',
             'avg_time': 'seconds',
             'execution_count': 'count',
-            'success_rate': '%'
+            'success_rate': '%',
+            'hierarchical_timeline': 'timeline'
         }
         
         # Prepare data
@@ -54,8 +57,12 @@ class InteractivePlotViewer:
             'total_time': [stats['total_time'] for stats in node_summary.values()],
             'avg_time': [stats['average_time'] for stats in node_summary.values()],
             'execution_count': [stats['total_executions'] for stats in node_summary.values()],
-            'success_rate': [stats['success_rate'] for stats in node_summary.values()]
+            'success_rate': [stats['success_rate'] for stats in node_summary.values()],
+            'hierarchical_timeline': []  # Special case - will be handled separately
         }
+        
+        # Extract workflow structure for hierarchical view
+        self.workflow_structure = self.extract_workflow_structure()
         
         # Calculate optimal figure size
         num_nodes = len(self.node_names)
@@ -72,11 +79,46 @@ class InteractivePlotViewer:
             self.fig_width = 18
             self.fig_height = 14
     
+    def extract_workflow_structure(self) -> Dict[str, Any]:
+        """Extract workflow structure from execution data."""
+        workflow_data = self.execution_info.get('workflow_data', {})
+        nodes = workflow_data.get('nodes', [])
+        connections = workflow_data.get('connections', {})
+        
+        # Build node structure
+        node_structure = {}
+        for node in nodes:
+            node_structure[node['id']] = {
+                'name': node.get('name', node['id']),
+                'type': node.get('type', 'unknown'),
+                'position': node.get('position', {'x': 0, 'y': 0}),
+                'connections': []
+            }
+        
+        # Build connections
+        for source_id, targets in connections.items():
+            if source_id in node_structure:
+                for target_id in targets:
+                    if target_id in node_structure:
+                        node_structure[source_id]['connections'].append(target_id)
+        
+        return node_structure
+    
     def create_plot(self):
         """Create the current plot."""
         plt.clf()  # Clear the current figure
         
         plot_type = self.plots[self.current_plot]
+        
+        if plot_type == 'hierarchical_timeline':
+            self.create_hierarchical_timeline()
+        else:
+            self.create_bar_chart(plot_type)
+        
+        plt.tight_layout()
+    
+    def create_bar_chart(self, plot_type: str):
+        """Create a bar chart for the given plot type."""
         plot_data = self.data[plot_type]
         
         # Create the main plot
@@ -112,14 +154,124 @@ class InteractivePlotViewer:
         info_text = f"Execution {self.execution_info['execution_id']} | {self.execution_info['workflow_name']} | {self.execution_info['total_nodes']} nodes"
         ax.text(0.02, 0.98, info_text, transform=ax.transAxes, fontsize=10, 
                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
-
-        # Keyboard shortcuts info
-        ax_help = plt.axes([0.02, 0.02, 0.06, 0.04])
-        ax_help.axis('off')
-        ax_help.text(0.5, 0.5, '← → keys', ha='center', va='center', fontsize=8, 
-                    bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.7))
-                            
-        plt.tight_layout()
+    
+    def create_hierarchical_timeline(self):
+        """Create hierarchical timeline visualization."""
+        ax = plt.subplot(111)
+        
+        # Set up the plot
+        ax.set_title(f'{self.plot_titles["hierarchical_timeline"]} (Plot {self.current_plot + 1}/{len(self.plots)})', 
+                    fontsize=16, fontweight='bold')
+        ax.set_xlabel('Time', fontsize=12)
+        ax.set_ylabel('Node Hierarchy', fontsize=12)
+        
+        # Get execution timeline data
+        timeline_data = self.build_execution_timeline()
+        
+        if not timeline_data:
+            ax.text(0.5, 0.5, 'No timeline data available', ha='center', va='center', 
+                   transform=ax.transAxes, fontsize=14)
+            return
+        
+        # Plot timeline bars
+        y_positions = {}
+        y_pos = 0
+        
+        for node_name, executions in timeline_data.items():
+            y_positions[node_name] = y_pos
+            
+            for execution in executions:
+                start_time = execution['start_time']
+                duration = execution['duration']
+                status = execution['status']
+                
+                # Convert to relative time (seconds from start)
+                if start_time and self.execution_info.get('start_time'):
+                    # Handle timezone mismatch - make both datetimes timezone-aware
+                    exec_start_time = self.execution_info['start_time']
+                    if start_time.tzinfo is None and exec_start_time.tzinfo is not None:
+                        # Make start_time timezone-aware by assuming UTC
+                        start_time = start_time.replace(tzinfo=exec_start_time.tzinfo)
+                    elif start_time.tzinfo is not None and exec_start_time.tzinfo is None:
+                        # Make exec_start_time timezone-aware by assuming UTC
+                        exec_start_time = exec_start_time.replace(tzinfo=start_time.tzinfo)
+                    
+                    relative_start = (start_time - exec_start_time).total_seconds()
+                else:
+                    relative_start = 0
+                
+                # Color based on status
+                color = 'green' if status == 'success' else 'red' if status == 'error' else 'orange'
+                
+                # Draw execution bar
+                bar = patches.Rectangle((relative_start, y_pos - 0.4), duration, 0.8, 
+                                      facecolor=color, alpha=0.7, edgecolor='black', linewidth=0.5)
+                ax.add_patch(bar)
+                
+                # Add duration label
+                if duration > 0.1:  # Only show label for longer executions
+                    ax.text(relative_start + duration/2, y_pos, f'{duration:.2f}s', 
+                           ha='center', va='center', fontsize=8, fontweight='bold')
+            
+            y_pos += 1
+        
+        # Set y-axis labels
+        ax.set_yticks(range(len(timeline_data)))
+        ax.set_yticklabels(list(timeline_data.keys()))
+        
+        # Set x-axis limits
+        all_start_times = []
+        for execs in timeline_data.values():
+            for exec in execs:
+                if exec['start_time']:
+                    all_start_times.append(exec['start_time'])
+        
+        if all_start_times and self.execution_info.get('start_time'):
+            max_time = max(all_start_times)
+            # Handle timezone mismatch for x-axis limits
+            exec_start_time = self.execution_info['start_time']
+            if max_time.tzinfo is None and exec_start_time.tzinfo is not None:
+                max_time = max_time.replace(tzinfo=exec_start_time.tzinfo)
+            elif max_time.tzinfo is not None and exec_start_time.tzinfo is None:
+                exec_start_time = exec_start_time.replace(tzinfo=max_time.tzinfo)
+            
+            max_relative_time = (max_time - exec_start_time).total_seconds()
+            ax.set_xlim(0, max_relative_time + 1)
+        
+        ax.grid(True, alpha=0.3)
+        
+        # Add legend
+        legend_elements = [
+            patches.Patch(color='green', alpha=0.7, label='Success'),
+            patches.Patch(color='red', alpha=0.7, label='Error'),
+            patches.Patch(color='orange', alpha=0.7, label='Other')
+        ]
+        ax.legend(handles=legend_elements, loc='upper right')
+        
+        # Add execution info
+        info_text = f"Execution {self.execution_info['execution_id']} | {self.execution_info['workflow_name']} | {self.execution_info['total_nodes']} nodes"
+        ax.text(0.02, 0.98, info_text, transform=ax.transAxes, fontsize=10, 
+               verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+    
+    def build_execution_timeline(self) -> Dict[str, List[Dict]]:
+        """Build timeline data from node executions."""
+        timeline_data = {}
+        
+        for node_name, stats in self.node_summary.items():
+            executions = []
+            for execution in stats['executions']:
+                if execution['start_time'] and execution['duration']:
+                    executions.append({
+                        'start_time': execution['start_time'],
+                        'duration': execution['duration'],
+                        'status': execution['status']
+                    })
+            
+            # Sort by start time
+            executions.sort(key=lambda x: x['start_time'])
+            timeline_data[node_name] = executions
+        
+        return timeline_data
     
     def prev_plot(self, event):
         """Go to previous plot."""
@@ -238,6 +390,7 @@ class N8nLoopedNodeAnalyzer:
         execution_id = execution_data.get('id')
         workflow_id = execution_data.get('workflowId')
         workflow_name = execution_data.get('workflowData', {}).get('name', 'Unknown')
+        workflow_data = execution_data.get('workflowData', {})
         status = execution_data.get('status', 'unknown')
         started_at = execution_data.get('startedAt')
         stopped_at = execution_data.get('stoppedAt')
@@ -281,8 +434,8 @@ class N8nLoopedNodeAnalyzer:
                         node_duration = None
                         
                         if start_timestamp:
-                            # Convert from milliseconds to datetime
-                            node_start_time = datetime.fromtimestamp(start_timestamp / 1000)
+                            # Convert from milliseconds to datetime (UTC)
+                            node_start_time = datetime.fromtimestamp(start_timestamp / 1000, tz=timezone.utc)
                             node_duration = execution_time / 1000.0  # Convert to seconds
                         
                         node_execution = {
@@ -323,6 +476,7 @@ class N8nLoopedNodeAnalyzer:
             'execution_id': execution_id,
             'workflow_id': workflow_id,
             'workflow_name': workflow_name,
+            'workflow_data': workflow_data,
             'status': status,
             'start_time': start_time,
             'end_time': end_time,
@@ -401,9 +555,10 @@ class N8nLoopedNodeAnalyzer:
         print("\n🎯 Starting Interactive Plot Viewer...")
         print("="*60)
         print("NAVIGATION CONTROLS:")
-        print("• Use ← → arrow keys (or A/D keys)")
+        print("• Use ← → arrow keys (or A/D keys) to navigate")
         print("• Press Q or Escape to close")
         print("• All plots in one window with smooth navigation")
+        print("• Includes: Bar charts + Hierarchical Timeline View")
         print("="*60)
         
         # Create interactive viewer
