@@ -37,7 +37,6 @@ python3 n8n-timings.py --execution-id 1000 --export-png
 
 - **Console Summary**: Execution details and node statistics
 - **Interactive Plots**: Total time, average time, execution count, success rate, and timeline view
-- **PNG Export**: High-resolution plots saved to `plots/` directory
 
 - ![`1000_0_TotalTime.png`](plots/1000_0_TotalTime.png)
 - ![`1000_1_AvgTime.png`](plots/1000_1_AvgTime.png)
