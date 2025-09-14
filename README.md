@@ -55,8 +55,8 @@ python3 n8n-timings.py --execution-id 1000 --export-png --png-width 3500 --png-h
 
 **Output**: Files saved to `plots/` directory with format `{EXECUTIONID}_{INDEX}_{PlotName}.png`
 
-- [`1000_0_TotalTime.png`](plots/1000_0_TotalTime.png)
-- [`1000_1_AvgTime.png`](plots/1000_1_AvgTime.png)
-- [`1000_2_ExecutionCount.png`](plots/1000_2_ExecutionCount.png)
-- [`1000_3_SuccessRate.png`](plots/1000_3_SuccessRate.png)
-- [`1000_4_HierarchicalTimeline.png`](plots/1000_4_HierarchicalTimeline.png)
+- ![`1000_0_TotalTime.png`](plots/1000_0_TotalTime.png)
+- ![`1000_1_AvgTime.png`](plots/1000_1_AvgTime.png)
+- ![`1000_2_ExecutionCount.png`](plots/1000_2_ExecutionCount.png)
+- ![`1000_3_SuccessRate.png`](plots/1000_3_SuccessRate.png)
+- ![`1000_4_HierarchicalTimeline.png`](plots/1000_4_HierarchicalTimeline.png)
