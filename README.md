@@ -41,4 +41,22 @@ python3 n8n-timings.py --execution-id 1000
 - Success rate by node
 - Hierarchical timeline view
 
-![Screenshot](docs/screenshot.png)
+## Examples
+
+Export plots as high-resolution PNG files:
+
+```bash
+# Export with default 1920x1080 resolution
+python3 n8n-timings.py --execution-id 1000 --export-png
+
+# Export with custom resolution
+python3 n8n-timings.py --execution-id 1000 --export-png --png-width 3500 --png-height 1500
+```
+
+**Output**: Files saved to `plots/` directory with format `{EXECUTIONID}_{INDEX}_{PlotName}.png`
+
+- [`1000_0_TotalTime.png`](plots/1000_0_TotalTime.png)
+- [`1000_1_AvgTime.png`](plots/1000_1_AvgTime.png)
+- [`1000_2_ExecutionCount.png`](plots/1000_2_ExecutionCount.png)
+- [`1000_3_SuccessRate.png`](plots/1000_3_SuccessRate.png)
+- [`1000_4_HierarchicalTimeline.png`](plots/1000_4_HierarchicalTimeline.png)

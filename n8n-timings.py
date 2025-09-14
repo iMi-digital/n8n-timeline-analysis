@@ -305,6 +305,90 @@ class InteractivePlotViewer:
         
         # Show the plot
         plt.show()
+    
+    def save_plot_as_png(self, plot_index: int, plot_name: str, width_pixels: int, height_pixels: int, output_dir: str = ".") -> str:
+        """
+        Save a specific plot as PNG file.
+        
+        Args:
+            plot_index: Index of the plot to save (0-based)
+            plot_name: Name of the plot for filename
+            width_pixels: Width in pixels
+            height_pixels: Height in pixels
+            output_dir: Directory to save the PNG file
+            
+        Returns:
+            Path to the saved PNG file
+        """
+        # Set the current plot
+        self.current_plot = plot_index
+        
+        # Convert pixels to inches (assuming 100 DPI)
+        dpi = 100
+        fig_width = width_pixels / dpi
+        fig_height = height_pixels / dpi
+        
+        # Create figure with specified dimensions
+        fig = plt.figure(figsize=(fig_width, fig_height), dpi=dpi)
+        
+        # Create the plot
+        self.create_plot()
+        
+        # Generate filename using the specified format: $EXECUTIONID_$INDEX_PlotName.png
+        execution_id = self.execution_info.get('execution_id', 'unknown')
+        filename = f"{execution_id}_{plot_index}_{plot_name}.png"
+        filepath = os.path.join(output_dir, filename)
+        
+        # Save the plot
+        plt.savefig(filepath, dpi=dpi, bbox_inches='tight', facecolor='white', edgecolor='none')
+        plt.close(fig)  # Close the figure to free memory
+        
+        return filepath
+    
+    def export_all_plots_as_png(self, width_pixels: int, height_pixels: int, output_dir: str = ".") -> List[str]:
+        """
+        Export all plots as PNG files.
+        
+        Args:
+            width_pixels: Width in pixels
+            height_pixels: Height in pixels
+            output_dir: Directory to save the PNG files
+            
+        Returns:
+            List of paths to saved PNG files
+        """
+        saved_files = []
+        
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Plot names for filenames
+        plot_names = {
+            'total_time': 'TotalTime',
+            'avg_time': 'AvgTime', 
+            'execution_count': 'ExecutionCount',
+            'success_rate': 'SuccessRate',
+            'hierarchical_timeline': 'HierarchicalTimeline'
+        }
+        
+        print(f"\n📸 Exporting {len(self.plots)} plots as PNG files...")
+        print(f"📁 Output directory: {output_dir}")
+        print(f"📏 Dimensions: {width_pixels}x{height_pixels} pixels")
+        print("="*60)
+        
+        for i, plot_type in enumerate(self.plots):
+            plot_name = plot_names[plot_type]
+            try:
+                filepath = self.save_plot_as_png(i, plot_name, width_pixels, height_pixels, output_dir)
+                saved_files.append(filepath)
+                print(f"✅ Saved: {os.path.basename(filepath)}")
+            except Exception as e:
+                print(f"❌ Failed to save {plot_name}: {e}")
+        
+        print("="*60)
+        print(f"🎉 Exported {len(saved_files)} PNG files successfully!")
+        
+        return saved_files
 
 class N8nLoopedNodeAnalyzer:
     """Analyzes n8n workflow execution data with looped nodes."""
@@ -541,35 +625,57 @@ class N8nLoopedNodeAnalyzer:
                 start_time_str = exec_data['start_time'].strftime('%H:%M:%S.%f')[:-3] if exec_data['start_time'] else "N/A"
                 print(f"  {i+1}. Duration: {exec_data['duration']:.3f}s at {start_time_str} (Status: {exec_data['status']})")
     
-    def create_interactive_visualization(self, analysis_data: Dict[str, Any]):
+    def create_interactive_visualization(self, analysis_data: Dict[str, Any], export_png: bool = False, png_width: int = 1920, png_height: int = 1080):
         """
         Create interactive visualization for looped node execution.
         
         Args:
             analysis_data: Analysis data from analyze_looped_execution
+            export_png: If True, export plots as PNG files instead of showing interactive viewer
+            png_width: Width in pixels for PNG export
+            png_height: Height in pixels for PNG export
         """
         if not analysis_data or not analysis_data.get('node_summary'):
             print("No node summary data available for plotting")
             return
         
-        print("\n🎯 Starting Interactive Plot Viewer...")
-        print("="*60)
-        print("NAVIGATION CONTROLS:")
-        print("• Use ← → arrow keys (or A/D keys) to navigate")
-        print("• Press Q or Escape to close")
-        print("• All plots in one window with smooth navigation")
-        print("• Includes: Bar charts + Hierarchical Timeline View")
-        print("="*60)
-        
         # Create interactive viewer
         viewer = InteractivePlotViewer(analysis_data['node_summary'], analysis_data)
-        viewer.show()
+        
+        if export_png:
+            print("\n📸 PNG Export Mode")
+            print("="*60)
+            print(f"📏 Dimensions: {png_width}x{png_height} pixels")
+            print(f"📁 Output directory: ./plots/")
+            print("="*60)
+            
+            # Export all plots as PNG files
+            saved_files = viewer.export_all_plots_as_png(png_width, png_height, "./plots")
+            
+            if saved_files:
+                print(f"\n📋 Generated files:")
+                for filepath in saved_files:
+                    print(f"  • {filepath}")
+        else:
+            print("\n🎯 Starting Interactive Plot Viewer...")
+            print("="*60)
+            print("NAVIGATION CONTROLS:")
+            print("• Use ← → arrow keys (or A/D keys) to navigate")
+            print("• Press Q or Escape to close")
+            print("• All plots in one window with smooth navigation")
+            print("• Includes: Bar charts + Hierarchical Timeline View")
+            print("="*60)
+            
+            viewer.show()
 
 def main():
     """Main function to run the analyzer."""
     parser = argparse.ArgumentParser(description='Analyze n8n looped node execution with interactive navigation')
     parser.add_argument('--execution-id', type=int, required=True, help='Execution ID to analyze')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode to see raw API responses')
+    parser.add_argument('--export-png', action='store_true', help='Export plots as PNG files instead of showing interactive viewer')
+    parser.add_argument('--png-width', type=int, default=1920, help='PNG width in pixels (default: 1920)')
+    parser.add_argument('--png-height', type=int, default=1080, help='PNG height in pixels (default: 1080)')
     
     args = parser.parse_args()
     
@@ -601,7 +707,10 @@ def main():
         print("✅ Execution data fetched successfully!")
         analysis = analyzer.analyze_looped_execution(execution_data)
         analyzer.create_looped_summary_report(analysis)
-        analyzer.create_interactive_visualization(analysis)
+        analyzer.create_interactive_visualization(analysis, 
+                                                export_png=args.export_png, 
+                                                png_width=args.png_width, 
+                                                png_height=args.png_height)
     else:
         print("❌ Failed to fetch execution data")
 
